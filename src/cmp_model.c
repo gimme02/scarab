@@ -28,6 +28,7 @@
 
 /**************************************************************************************/
 
+#include "br_ld_overlap.h"
 #include "cmp_model.h"
 
 #include "globals/assert.h"
@@ -373,6 +374,7 @@ void cmp_wake(Op* src_op, Op* dep_op, uns rdy_bit) {
 /* cmp_recover: */
 
 void cmp_recover() {
+  if (BR_LD_OVERLAP_ENABLE) brld_recover(bp_recovery_info->recovery_op);
   _DEBUG(bp_recovery_info->proc_id, DEBUG_BP, "Recovery fired op_num:%s at cycle:%s (scheduled:%s)\n",
          unsstr64(bp_recovery_info->recovery_op_num), unsstr64(cycle_count),
          unsstr64(bp_recovery_info->recovery_cycle));

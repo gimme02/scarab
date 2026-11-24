@@ -26,6 +26,7 @@
  * Description  :
  ***************************************************************************************/
 
+#include "br_ld_overlap.h"
 #include "map.h"
 
 #include <stdlib.h>
@@ -420,6 +421,7 @@ void map_dep_fetch(Op* op) {
   // write the op for its consumers
   map_dep_write_map(op, op->off_path ? &map_data->offpath_map : &map_data->onpath_map, &map_data->oracle_mem_hash);
   map_dep_write_offpath_valid(op);
+  if (BR_LD_OVERLAP_ENABLE) brld_mapped(op);
 }
 
 void map_dep_remove_store(Op* op) {
@@ -432,6 +434,7 @@ void map_dep_remove_store(Op* op) {
 /* External Wakeup Functions */
 
 void map_wakeup_signal(Op* op, Dep_Type type, void (*wake_action)(Op*, Op*, uns)) {
+  if (BR_LD_OVERLAP_ENABLE && type == REG_DATA_DEP && op->uop->mem_type == MEM_LD) brld_ready(op);
   ASSERT(op->proc_id, !op->wake_up_signaled[type] || op->replay);
 
   // write back the register value for the dependent ops

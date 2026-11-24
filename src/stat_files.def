@@ -38,3 +38,5 @@
 #include "power/power.stat.def"
 #include "prefetcher/pref.stat.def"
 
+
+#include "br_ld_overlap.stat.def"

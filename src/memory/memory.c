@@ -27,6 +27,7 @@
  ***************************************************************************************/
 /*** CMP  remov all the wrong path stuff  ***/
 
+#include "br_ld_overlap.h"
 #include "memory.h"
 
 #include <limits.h>
@@ -2209,6 +2210,7 @@ Flag mem_adjust_matching_request(Mem_Req* req, Mem_Req_Type type, Addr addr, uns
     if (!req->done_func)
       req->done_func = done_func;
     if (req->l1_miss) {
+      if (BR_LD_OVERLAP_ENABLE && !req->l1_miss_satisfied) brld_llc_miss(op, TRUE);
       op->engine_info.l1_miss = TRUE;
       if (TRACK_L1_MISS_DEPS)
         mark_l1_miss_deps(op);
@@ -3556,6 +3558,7 @@ static void mark_ops_as_l1_miss(Mem_Req* req) {
     if (op->unique_num == *op_unique && op->op_pool_valid) {
       ASSERT(req->proc_id, req->proc_id == op->proc_id);
       if (op->req == req) {
+        if (BR_LD_OVERLAP_ENABLE && !req->l1_miss_satisfied) brld_llc_miss(op, FALSE);
         op->engine_info.l1_miss = TRUE;
         if (TRACK_L1_MISS_DEPS)
           mark_l1_miss_deps(op);

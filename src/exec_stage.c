@@ -28,6 +28,7 @@
  * Description  :
  ***************************************************************************************/
 
+#include "br_ld_overlap.h"
 #include "exec_stage.h"
 
 #include "globals/assert.h"
@@ -528,6 +529,7 @@ static inline int exec_stage_check_fu_available(int ii) {
 }
 
 static inline void exec_stage_process_op(Op* op) {
+  if (BR_LD_OVERLAP_ENABLE) brld_issue(op);
   // set the op's state to reflect it's execution
   if (op->uop->mem_type == NOT_MEM || STALL_ON_WAIT_MEM) {
     op->state = OS_SCHEDULED;
@@ -550,6 +552,7 @@ static inline void exec_stage_process_op(Op* op) {
 }
 
 static inline void exec_stage_bp_resolve(Op* op) {
+  if (BR_LD_OVERLAP_ENABLE) brld_resolve(op);
   if (!BP_UPDATE_AT_RETIRE) {
     // this code updates the branch prediction structures
     if (op->uop->cf_type >= CF_IBR)

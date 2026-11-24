@@ -26,6 +26,7 @@
  * Description  :
  ***************************************************************************************/
 
+#include "br_ld_overlap.h"
 #include "sim.h"
 
 #include <errno.h>
@@ -217,6 +218,7 @@ static inline void check_heartbeat(uns8 proc_id, Flag final) {
       dump_stats(i, TRUE, global_stat_array[i], NUM_GLOBAL_STATS);
       period_last_inst_count[i] = inst_count_fetched[i];
       warmup_dump_done[i] = TRUE;
+      if (BR_LD_OVERLAP_ENABLE) brld_start_roi(i);
     }
     reset_h2p_stats();
     period_last_cycle_count = cycle_count;
@@ -693,6 +695,8 @@ void full_sim() {
 
   init_op_pool();
 
+  if (BR_LD_OVERLAP_ENABLE || BR_LD_OVERLAP_SELFTEST) brld_init();
+
   // need to fill lookahead buffer after init_op_pool
   if (LOOKAHEAD_BUF_SIZE) {
     for (proc_id = 0; proc_id < NUM_CORES; proc_id++) {
@@ -741,6 +745,7 @@ void full_sim() {
       if (SIM_MODEL != DUMB_MODEL && DUMB_CORE_ON && DUMB_CORE == proc_id)
         continue;
       if (!sim_done[proc_id] && (retired_exit[proc_id] || reachedInstLimit)) {
+        if (BR_LD_OVERLAP_ENABLE) brld_finish(proc_id);
         if (model->per_core_done_func)
           model->per_core_done_func(proc_id);
         if (CONFIDENCE_ENABLE) {
@@ -805,6 +810,7 @@ void full_sim() {
 
   for (proc_id = 0; proc_id < NUM_CORES; proc_id++) {
     if (!sim_done[proc_id]) {
+      if (BR_LD_OVERLAP_ENABLE) brld_finish(proc_id);
       if (PERIODIC_DUMP == FALSE) {
         dump_stats(proc_id, TRUE, global_stat_array[proc_id], NUM_GLOBAL_STATS);
       }

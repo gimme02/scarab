@@ -404,3 +404,8 @@ DEF_PARAM(dfe4_stop_policy, DFE4_STOP_POLICY, uns, uns, 1, )
 
 DEF_PARAM(lookahead_buf_size, LOOKAHEAD_BUF_SIZE, uns, uns, 0, )
 DEF_PARAM(map_lookahead, MAP_LOOKAHEAD, Flag, Flag, FALSE, )
+
+// Observer-only branch/load overlap instrumentation.
+DEF_PARAM(br_ld_overlap_enable, BR_LD_OVERLAP_ENABLE, Flag, Flag, FALSE, )
+DEF_PARAM(br_ld_overlap_debug_events, BR_LD_OVERLAP_DEBUG_EVENTS, Flag, Flag, FALSE, )
+DEF_PARAM(br_ld_overlap_selftest, BR_LD_OVERLAP_SELFTEST, Flag, Flag, FALSE, )

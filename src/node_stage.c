@@ -26,6 +26,7 @@
  * Description  :
  ***************************************************************************************/
 
+#include "br_ld_overlap.h"
 #include "node_stage.h"
 
 #include <stdio.h>
@@ -392,6 +393,7 @@ void node_fill_rob(Stage_Data* src_sd) {
     /* set op fields */
     op->node_id = node->node_count;
     op_set_dispatch_cycle(op, cycle_count);
+    if (BR_LD_OVERLAP_ENABLE) brld_dispatch(op);
 
     /* add to node list & update node state*/
     ASSERT(node->proc_id, !op->in_node_list);
