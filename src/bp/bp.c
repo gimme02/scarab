@@ -40,6 +40,7 @@
 
 #include "bp/bp.param.h"
 #include "core.param.h"
+#include "dpe_oracle.h"
 #include "prefetcher/pref.param.h"
 
 #include "bp//bp_conf.h"
@@ -540,6 +541,9 @@ static Addr bp_predict_op_impl(Bp_Data* bp_data, Op* op, uns bp_id, uns br_num, 
       } else {
         ASSERT(op->proc_id, !PERFECT_NT_BTB);  // currently not supported
         bp_pred_info->pred = pred_bp->pred_func(op, pred_level);
+        if (DPE_ORACLE_MODE && bp_id == MAIN_BP && pred_level == BP_PRED_MAIN &&
+            op->uop->cf_type == CF_CBR && !op->off_path)
+          bp_pred_info->pred = dpo_predict(op, bp_pred_info->pred);
         bp_pred_info->pred_orig = bp_pred_info->pred;
       }
       // Update history used by the rest of Scarab.

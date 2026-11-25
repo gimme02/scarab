@@ -29,6 +29,7 @@
 /**************************************************************************************/
 
 #include "br_ld_overlap.h"
+#include "dpe_oracle.h"
 #include "cmp_model.h"
 
 #include "globals/assert.h"
@@ -247,6 +248,9 @@ void cmp_cores(void) {
       cmp_set_all_stages(proc_id);
       cmp_set_all_data(proc_id, 0);
 
+      // Recoveries have already run in cmp_istreams. Complete only surviving barriers.
+      if (DPE_ORACLE_MODE) dpo_advance(proc_id);
+
       /* Back-end pipeline */
       update_dcache_stage(&exec->sd);
       update_exec_stage(&node->sd);
@@ -277,6 +281,7 @@ void cmp_cores(void) {
       update_eip();
       pref_update_icache(proc_id);
 
+      if (DPE_ORACLE_MODE) dpo_end_cycle(proc_id);
       cmp_measure_chip_util();
     }
   }

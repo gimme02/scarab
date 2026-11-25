@@ -409,3 +409,8 @@ DEF_PARAM(map_lookahead, MAP_LOOKAHEAD, Flag, Flag, FALSE, )
 DEF_PARAM(br_ld_overlap_enable, BR_LD_OVERLAP_ENABLE, Flag, Flag, FALSE, )
 DEF_PARAM(br_ld_overlap_debug_events, BR_LD_OVERLAP_DEBUG_EVENTS, Flag, Flag, FALSE, )
 DEF_PARAM(br_ld_overlap_selftest, BR_LD_OVERLAP_SELFTEST, Flag, Flag, FALSE, )
+
+// Correct main direction, optionally gate issue behind raw main mispredictions.
+DEF_PARAM(dpe_oracle_mode, DPE_ORACLE_MODE, uns, uns, 0, )
+DEF_PARAM(dpe_oracle_debug_events, DPE_ORACLE_DEBUG_EVENTS, Flag, Flag, FALSE, )
+DEF_PARAM(dpe_oracle_selftest, DPE_ORACLE_SELFTEST, Flag, Flag, FALSE, )

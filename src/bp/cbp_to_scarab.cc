@@ -158,6 +158,8 @@ void CBP_To_Scarab_Intf<TAGE64K>::spec_update(Op* op, Bp_Pred_Level pred_level) 
     }
   }
 
+  // Direction correction must not masquerade as a correct realistic prediction during learning.
+  const Flag training_dir = op->dpo_pred_valid ? op->dpo_realistic_dir : bp_pred_info->pred;
   // Real update start
   if (is_conditional) {
     cbp_predictors_all_cores.at(proc_id).at(bp_id)->SpecUpdateAtCond(op->inst->addr, pred_dir, false);
@@ -165,7 +167,8 @@ void CBP_To_Scarab_Intf<TAGE64K>::spec_update(Op* op, Bp_Pred_Level pred_level) 
                                                                op->oracle_info.target);
     if (SPEC_LEVEL < BP_PRED_ONOFF_SPEC_UPDATE_S_ONOFF_UPDATE_N_ON)
       cbp_predictors_all_cores.at(proc_id).at(bp_id)->NonSpecUpdateAtCond(op->inst->addr, optype, op->oracle_info.dir,
-                                                                          bp_pred_info->pred, op->oracle_info.target,
+                                                                          training_dir,
+                                                                          op->oracle_info.target,
                                                                           op->recovery_info.branch_id);
   } else {
     cbp_predictors_all_cores.at(proc_id).at(bp_id)->SpecUpdate(op->inst->addr, optype, pred_dir,
@@ -203,9 +206,11 @@ void CBP_To_Scarab_Intf<TAGE64K>::update(Op* op,
   OpType optype = scarab_to_cbp_optype(op->uop->cf_type);
   Flag is_conditional = is_conditional_branch(op->uop->cf_type);
 
+  const Flag training_dir = op->dpo_pred_valid ? op->dpo_realistic_dir : bp_pred_info->pred;
   if (is_conditional)
     cbp_predictors_all_cores.at(proc_id).at(bp_id)->NonSpecUpdateAtCond(op->inst->addr, optype, op->oracle_info.dir,
-                                                                        bp_pred_info->pred, op->oracle_info.target,
+                                                                        training_dir,
+                                                                        op->oracle_info.target,
                                                                         op->recovery_info.branch_id);
   else
     cbp_predictors_all_cores.at(proc_id).at(bp_id)->TrackOtherInst(op->inst->addr, optype, op->oracle_info.dir,

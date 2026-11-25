@@ -182,6 +182,12 @@ struct Op_struct {
   uns num_srcs;                 // number of map dependencies (order matches srcs_not_rdy_words / wake-up)
   Src_Info* src_info;           /* grown by map (2 -> 8 -> 128, then x2); freed in free_op */
   uns src_info_cap;
+  Counter dpo_generation;       // barrier generation, independent of Scarab unique_num
+  Flag dpo_pred_valid;
+  Flag dpo_realistic_dir;
+  Flag dpo_oracle_dir;
+  Flag dpo_applied_dir;
+  Flag dpo_gate_logged;
   Bp_Pred_Info bp_pred_l0;       // l0 branch prediction info
   Bp_Pred_Info bp_pred_main;     // main branch prediction info
   Btb_Pred_Info btb_pred;        // btb prediction info

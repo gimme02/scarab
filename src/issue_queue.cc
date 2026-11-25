@@ -41,6 +41,7 @@ extern "C" {
 #include "debug/debug_print.h"
 
 #include "core.param.h"
+#include "dpe_oracle.h"
 
 #include "bp/bp.h"
 #include "memory/memory.h"
@@ -411,6 +412,10 @@ void SelectLogic::bid(IssueQueueStats& stats_across_queue) {
     if (entry->state != ISSUE_QUEUE_ENTRY_STATE_READY || !issue_queue_check_op_ready(entry->op)) {
       continue;
     }
+
+    // A ready op behind a barrier never bids for a picker or consumes an issue port.
+    if (DPE_ORACLE_MODE == 1 && dpo_gate(entry->op))
+      continue;
 
     // the current request propagated through the serial picker chain
     IssueQueueEntry* request_entry = entry;

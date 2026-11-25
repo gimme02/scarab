@@ -29,6 +29,7 @@ allocates them once and then hands out pointers every time 'alloc_op' is called.
 ***************************************************************************************/
 
 #include "br_ld_overlap.h"
+#include "dpe_oracle.h"
 #include "op_pool.h"
 
 #include <stddef.h>
@@ -198,6 +199,7 @@ void free_op(Op* op) {
   if (PIPEVIEW)
     pipeview_print_op(op);
 
+  if (DPE_ORACLE_MODE) dpo_release(op);
   if (BR_LD_OVERLAP_ENABLE) brld_release(op);
   op->op_pool_valid = FALSE;
   op_pool_active_ops--;
