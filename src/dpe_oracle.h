@@ -14,6 +14,8 @@ void dpo_advance(uns proc_id);
 void dpo_end_cycle(uns proc_id);
 void dpo_start_roi(uns proc_id);
 void dpo_finish(uns proc_id);
+Flag dpo_frontend_stalled(uns proc_id);
+void dpo_frontend_check(Op* op);
 #ifdef __cplusplus
 }
 #endif

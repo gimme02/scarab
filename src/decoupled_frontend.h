@@ -361,6 +361,7 @@ struct Decoupled_FE {
   bool is_off_path_state() const { return state == SERVING_OFF_PATH; }
   void check_consecutivity_and_push_to_ftq();
   void redirect_to_off_path(FT_PredictResult result);
+  void defer_serial_suffix(const FT_PredictResult& result);
   inline uint64_t ftq_max_size() { return ftq_ft_num; }
   void set_off_path_op_num(uint64_t op_num) { current_off_path_op_num = op_num; }
   void set_on_path_op_num(uint64_t op_num) { this->op_num = op_num; }

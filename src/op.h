@@ -188,6 +188,7 @@ struct Op_struct {
   Flag dpo_oracle_dir;
   Flag dpo_applied_dir;
   Flag dpo_gate_logged;
+  Flag dpo_serial_boundary;    // stable FT cut after the first inner mismatch
   Bp_Pred_Info bp_pred_l0;       // l0 branch prediction info
   Bp_Pred_Info bp_pred_main;     // main branch prediction info
   Btb_Pred_Info btb_pred;        // btb prediction info

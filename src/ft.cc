@@ -39,6 +39,7 @@
 
 extern "C" {
 #include "bp/bp_targ_mech.h"
+#include "dpe_oracle.h"
 #include "frontend/frontend.h"
 
 #include "thread.h"
@@ -383,6 +384,7 @@ FT_Event FT::predict_op_ft_event(Op* op, Bp_Pred_Level pred_level) {
 FT_PredictResult FT::predict_ft() {
   for (size_t idx = op_pos; idx < ops.size(); idx++) {
     Op* op = ops[idx];
+    if (DPE_ORACLE_SERIAL) dpo_frontend_check(op);
     bp_predict_btb(g_bp_data, op);
     FT_Event event = FT_EVENT_NONE;
     if (bp_l0_enabled()) {
@@ -458,6 +460,13 @@ FT_PredictResult FT::predict_ft() {
         decoupled_fe_on_main_prediction(proc_id, op);
     }
 
+    // Preserve any simultaneous L0/target recovery. The stable op marker also
+    // terminates off-path padding, so no successor escapes in this same cycle.
+    if (op->dpo_serial_boundary) {
+      ASSERT(proc_id, op->eom);
+      return {idx, event==FT_EVENT_NONE ? FT_EVENT_DPO_SERIAL_STOP : event,
+              op, op->bp_pred_info->pred_npc};
+    }
     if (event == FT_EVENT_FETCH_BARRIER) {
       STAT_EVENT(proc_id, op->off_path ? FTQ_SAW_BAR_FETCH_OFFPATH : FTQ_SAW_BAR_FETCH_ONPATH);
     }
@@ -505,6 +514,7 @@ bool FT::is_consecutive(const FT& previous_ft) const {
                                                    : last_op->inst->addr + last_op->inst->inst_size;
   bool matches = false;
   switch (prev_end_type) {
+    case FT_DPO_SERIAL_STOP:
     case FT_TAKEN_BRANCH:
       // Next FT must start at the predicted or actual NPC.
       matches = (pred_npc == start_addr) || (npc == start_addr);
@@ -541,6 +551,8 @@ FT_Ended_By FT::get_end_reason() const {
       return FT_APP_EXIT;
     } else if (bar_fetch) {
       return FT_BAR_FETCH;
+    } else if (op->dpo_serial_boundary) {
+      return FT_DPO_SERIAL_STOP;
     } else if (cf_taken) {
       return FT_TAKEN_BRANCH;
     } else if (end_of_icache_line) {

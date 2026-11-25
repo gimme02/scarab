@@ -13,6 +13,7 @@
 
 extern "C" {
 #include "bp/bp_targ_mech.h"
+#include "dpe_oracle.h"
 #include "bp/cbp_to_scarab.h"
 }
 #include "frontend/frontend_intf.h"
@@ -526,6 +527,10 @@ void Decoupled_FE::update() {
     ASSERT(proc_id, ftq.size() <= ftq_max_size());
     ASSERT(proc_id, cfs_taken_this_cycle <= FE_FTQ_TAKEN_CFS_PER_CYCLE);
 
+    // The B1 prefix has already been published; keep draining FTQ/backend.
+    // This guard applies to on-path, off-path and recovery FT generation.
+    if (bp_id == MAIN_BP && dpo_frontend_stalled(proc_id))
+      break;
     if (ftq.size() == ftq_max_size()) {
       DEBUG(proc_id, "[DFE%u] Break due to full FTQ\n", bp_id);
       STAT_EVENT(proc_id, FTQ_BREAK_FULL_FT_ONPATH + is_off_path_state());
@@ -580,7 +585,12 @@ void Decoupled_FE::update() {
         current_ft_to_push = saved_recovery_ft;
         saved_recovery_ft = nullptr;
         result = current_ft_to_push->predict_ft();
-        if (current_ft_to_push->ended_by_exit()) {
+        if (result.event == FT_EVENT_DPO_SERIAL_STOP) {
+          defer_serial_suffix(result);
+          break;
+        }
+        if (current_ft_to_push->ended_by_exit() &&
+            !(result.op && result.op->dpo_serial_boundary && !result.op->exit)) {
           // Ensure that the very last simulated FT does not cause a recovery
           current_ft_to_push->clear_recovery_info();
           check_consecutivity_and_push_to_ftq();
@@ -622,9 +632,14 @@ void Decoupled_FE::update() {
         }
 
         result = current_ft_to_push->predict_ft();
+        if (result.event == FT_EVENT_DPO_SERIAL_STOP) {
+          defer_serial_suffix(result);
+          break;
+        }
         // if current FT is the exit one, skip mispredict handling and directly push
         // set state and early return
-        if (current_ft_to_push->ended_by_exit()) {
+        if (current_ft_to_push->ended_by_exit() &&
+            !(result.op && result.op->dpo_serial_boundary && !result.op->exit)) {
           // Ensure that the very last simulated FT does not cause a recovery
           current_ft_to_push->clear_recovery_info();
           check_consecutivity_and_push_to_ftq();
@@ -1007,6 +1022,9 @@ Off_Path_Reason Decoupled_FE::eval_off_path_reason(Op* op) {
 }
 
 void Decoupled_FE::check_consecutivity_and_push_to_ftq() {
+  if (DPE_ORACLE_SERIAL && bp_id==MAIN_BP)
+    for (size_t i=current_ft_to_push->op_pos;i<current_ft_to_push->ops.size();++i)
+      dpo_frontend_check(current_ft_to_push->ops[i]);
   if (ftq.size())
     ASSERT(proc_id, current_ft_to_push->is_consecutive(*ftq.back()));
   if (CONFIDENCE_ENABLE && bp_id == MAIN_BP)
@@ -1021,6 +1039,18 @@ void Decoupled_FE::check_consecutivity_and_push_to_ftq() {
         current_ft_to_push->get_ft_info().dynamic_info.first_op_off_path, (int)current_ft_to_push->get_end_reason(),
         ftq.size(), ftq.size() + 1);
   ftq.emplace_back(std::move(current_ft_to_push));
+}
+
+void Decoupled_FE::defer_serial_suffix(const FT_PredictResult& result) {
+  ASSERT(proc_id,DPE_ORACLE_SERIAL && bp_id==MAIN_BP && result.op->dpo_serial_boundary);
+  ASSERT(proc_id,!saved_recovery_ft);
+  auto split=current_ft_to_push->extract_off_path_ft(result.index);
+  current_ft_to_push=split.first;
+  saved_recovery_ft=split.second;
+  // RECOVERING here means consuming the existing private on-path suffix;
+  // it does not call bp_recover_op, redirect, or charge a recovery penalty.
+  next_state=saved_recovery_ft ? RECOVERING : SERVING_ON_PATH;
+  if (current_ft_to_push->ended_by_exit()) next_state=INACTIVE;
 }
 
 void Decoupled_FE::redirect_to_off_path(FT_PredictResult result) {

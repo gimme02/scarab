@@ -1,4 +1,5 @@
 #include "dpe_oracle_model.h"
+#include "dpe_serial_model.h"
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -24,6 +25,8 @@ struct Counts {
 };
 struct Core {
   dpo::Barriers barriers;
+  dpo::Serial serial;
+  Counter serial_counts[12]={};
   Counts n;
   bool roi=false, finished=false;
   Counter instructions=0, gated_this_cycle=0, last_advance=dpo::never;
@@ -43,11 +46,30 @@ void event(Core* c, uns proc, const char* name, Counter order, Counter uid,
           (unsigned long long)uid, (unsigned long long)generation,
           (unsigned long long)value, (unsigned long long)pc);
 }
+void serial_events(Core* c, uns p, const std::vector<dpo::SerialEvent>& events) {
+  // First seven counters correspond to SerialKind in the standalone model.
+  static const char* names[]={"serial_start","serial_stop","serial_end","serial_cancel",
+    "serial_pending_cancel","serial_handoff","serial_handoff_resolved"};
+  for (const auto& e:events) {
+    unsigned k=static_cast<unsigned>(e.kind);
+    if (c->roi) ++c->serial_counts[k];
+    event(c,p,names[k],e.slot.order,e.slot.unique,e.slot.generation,e.other);
+    // Canceling an active root also invalidates its younger pending barrier.
+    if ((e.kind==dpo::SerialKind::PendingCancel || e.kind==dpo::SerialKind::Cancel) &&
+        c->barriers.cancel(e.slot.order,e.slot.generation)) {
+      if(c->roi) ++c->n.canceled;
+      event(c,p,"cancel",e.slot.order,e.slot.unique,e.slot.generation);
+    }
+  }
+}
 }
 
 void dpo_init(void) {
   ASSERTM(0, DPE_ORACLE_MODE <= 2, "dpe_oracle_mode must be 0, 1, or 2");
-  unsigned tests = DPE_ORACLE_SELFTEST ? dpo::selftest() : 0;
+  ASSERTM(0, !DPE_ORACLE_SERIAL || DPE_ORACLE_MODE, "serial oracle requires mode 1 or 2");
+  ASSERTM(0, !DPE_ORACLE_SERIAL || (!LOOKAHEAD_BUF_SIZE && !MAP_LOOKAHEAD),
+          "serial oracle currently requires lookahead_buf_size=0 and map_lookahead=0");
+  unsigned tests = DPE_ORACLE_SELFTEST ? dpo::selftest() + (DPE_ORACLE_SERIAL ? dpo::serial_selftest() : 0) : 0;
   if (tests) fprintf(mystdout, "DPO selftests passed: %u\n", tests);
   cores.clear();
   if (!DPE_ORACLE_MODE) return;
@@ -93,7 +115,24 @@ Flag dpo_predict(Op* op, Flag realistic) {
         (op->btb_pred_info->no_target<<5),op->inst->addr);
   if (op->dpo_generation)
     event(c,op->proc_id,"create",op->op_num,op->unique_num,op->dpo_generation,0,op->inst->addr);
+  if (DPE_ORACLE_SERIAL && op->dpo_generation) {
+    serial_events(c,op->proc_id,c->serial.add(op->op_num,op->dpo_generation,op->unique_num));
+    op->dpo_serial_boundary=c->serial.stalled();
+  }
   return op->dpo_applied_dir;
+}
+
+Flag dpo_frontend_stalled(uns p) {
+  auto* c=state(p);
+  return DPE_ORACLE_SERIAL && c && c->serial.stalled();
+}
+void dpo_frontend_check(Op* op) {
+  auto* c=state(op->proc_id);
+  if (!DPE_ORACLE_SERIAL || !c) return;
+  ASSERTM(op->proc_id,!c->serial.stalled() || op->op_num<=c->serial.pending().order,
+          "DPO frontend crossed pending branch");
+  event(c,op->proc_id,"serial_admit",op->op_num,op->unique_num,op->dpo_generation,
+        c->serial.pending().order,op->inst->addr);
 }
 
 Flag dpo_gate(Op* op) {
@@ -139,14 +178,20 @@ void dpo_advance(uns p) {
   c->last_advance=cycle_count;
   c->gated_this_cycle=0;
   for (const auto& b:c->barriers.advance(cycle_count)) {
+    if (DPE_ORACLE_SERIAL) c->serial.complete(b.order,b.generation);
     if (c->roi) ++c->n.resolved;
     event(c,p,"resolve",b.order,b.unique,b.generation,b.complete);
   }
+  if (DPE_ORACLE_SERIAL) serial_events(c,p,c->serial.advance());
 }
 
 void dpo_end_cycle(uns p) {
   auto* c=state(p);
   if (!c || !c->roi) return;
+  if (DPE_ORACLE_SERIAL && c->serial.stalled()) {
+    ++c->serial_counts[7];
+    event(c,p,"serial_stall_cycle",c->serial.active().order,0,c->serial.active().generation,c->serial.pending().order);
+  }
   if (!c->barriers.live().empty()) ++c->n.active_cycles;
   if (c->gated_this_cycle) ++c->n.gate_cycles;
   // Sparse per-cycle summaries allow exact debug/stat reconciliation.
@@ -157,6 +202,12 @@ void dpo_end_cycle(uns p) {
 void dpo_release(Op* op) {
   auto* c=state(op->proc_id);
   if (!c || !op->dpo_generation) return;
+  if (DPE_ORACLE_SERIAL) {
+    if (c->serial.active().matches(op->op_num,op->dpo_generation) ||
+        c->serial.pending().matches(op->op_num,op->dpo_generation))
+      ASSERTM(op->proc_id,op_get_retire_cycle(op)==MAX_CTR,"DPO live serial slot reached retirement");
+    serial_events(c,op->proc_id,c->serial.cancel(op->op_num,op->dpo_generation));
+  }
   if (c->barriers.find(op->op_num,op->dpo_generation)) {
     ASSERTM(op->proc_id,op_get_retire_cycle(op)==MAX_CTR,"DPO unresolved barrier reached retirement");
     c->barriers.cancel(op->op_num,op->dpo_generation);
@@ -170,9 +221,17 @@ void dpo_start_roi(uns p) {
   if (!c || c->roi) return;
   c->roi=true;
   c->n=Counts{};
+  for(auto& n:c->serial_counts) n=0;
+  c->serial_counts[8]=bool(c->serial.active());
+  c->serial_counts[9]=bool(c->serial.pending());
   c->instructions=inst_count[p];
   c->n.carry=c->barriers.live().size();
   event(c,p,"roi_start",0,0,0,c->n.carry);
+  if (DPE_ORACLE_SERIAL) {
+    const auto& a=c->serial.active(); const auto& b=c->serial.pending();
+    event(c,p,"serial_carry_active",a.order,a.unique,a.generation,a.resolved);
+    event(c,p,"serial_carry_pending",b.order,b.unique,b.generation,b.resolved);
+  }
   for (const auto& entry:c->barriers.live()) {
     const auto& b=entry.second;
     event(c,p,"carry",b.order,b.unique,b.generation,b.complete);
@@ -192,6 +251,13 @@ void dpo_finish(uns p) {
   };
   for (unsigned i=0;i<sizeof(values)/sizeof(values[0]);++i)
     INC_STAT_EVENT(p,DPO_CBR_COMPARED+i,values[i]);
+  if (DPE_ORACLE_SERIAL) {
+    auto* s=c->serial_counts;
+    s[10]=bool(c->serial.active()); s[11]=bool(c->serial.pending());
+    ASSERT(p,s[8]+s[0]==s[2]+s[3]+s[10]);
+    ASSERT(p,s[9]+s[1]==s[5]+s[4]+s[11]);
+    for(unsigned i=0;i<12;++i) INC_STAT_EVENT(p,DPO_SERIAL_STARTED+i,s[i]);
+  }
   event(c,p,"finish",0,0,c->barriers.live().size(),inst_count[p]-c->instructions);
   if (c->events) { fclose(c->events); c->events=nullptr; }
   c->finished=true;

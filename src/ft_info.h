@@ -38,7 +38,8 @@ typedef enum FT_Ended_By_enum {
   FT_ICACHE_LINE_BOUNDARY,
   FT_TAKEN_BRANCH,
   FT_BAR_FETCH,
-  FT_APP_EXIT
+  FT_APP_EXIT,
+  FT_DPO_SERIAL_STOP
 } FT_Ended_By;
 
 typedef struct FT_Info_Static_struct {
