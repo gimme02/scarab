@@ -1,6 +1,8 @@
-# File         : PARAMS.sunny_cove
+# Source: Mobius 1c06d7539cc28a7b8d2062f711926dccc6beb01c
+# Compatibility changes: docs/lion_cove_port.md. Not IPC-equivalent to Mobius.
+# File         : PARAMS.lion_cove
 # Date         : 05/12/23
-# Description  : Sunny Cove Configuration
+# Description  : Mobius Lion Cove configuration ported to current upstream
 # 
 # Based on documentation found here:
 # https://en.wikichip.org/wiki/intel/microarchitectures/sunny_cove
@@ -104,7 +106,8 @@
 ### Issue Stage
 
 # Max number of instructions to be renamed, and issued per cycle.
---issue_width                   8
+--rename_width                  8
+--dispatch_width                8
 
 --rs_fill_width                 0
 # rs_sizes 160 in total, but they are split between four different reservation stations https://www.anandtech.com/show/14514/examining-intels-ice-lake-microarchitecture-and-sunny-cove/3
@@ -168,10 +171,12 @@
 ### prefetcher
 # Kept same as Kaby Lake
 --pref_framework_on             1
---pref_stream_on                1
+--pref_num_l1_prefetchers        1
+--pref_l1_prefetchers            TYPE_STREAM,DEST_L1
 --pref_train_on_pref_misses     0
---pref_oracle_train             0
---pref_ul1req_queue_overwrite_on_full 1
+--pref_oracle_train_on          0
+# Upstream queues retry blocked candidates; legacy overwrite behavior is gone.
+--pref_retry                    1
 
 --stream_length                 64
 --stream_prefetch_n             4
@@ -188,7 +193,8 @@
 --pref_polpf_thresh=0.005
 --pref_update_interval=8192
 
---mem_req_buffer_pref_watermark 4
+--icache_mshr_demand_reserve     4
+--dcache_mshr_demand_reserve     4
 --promote_to_higher_priority_mem_req_type 1
 
 ### Memory
@@ -203,12 +209,15 @@
 --mem_priority_wb            5
 --mem_priority_wb_nodirty    5
 
---mem_req_buffer_entries        32
+# Upstream resources are per-level line MSHRs, not a shared request pool.
+--icache_mshrs                   16
+--dcache_mshrs                   32
+--mlc_mshrs                      32
+--l1_mshrs                       32
 --bus_width_in_bytes            8
 
---ramulator_standard             DDR4
---ramulator_speed                DDR4_3200
---ramulator_org                  DDR4_8Gb_x8
+--dram_backend                  ramulator2
+--ramulator2_config             DDR4_3200_Mobius_8Gb_x8_4ch_2rank
 --ramulator_channels             4
 --ramulator_ranks                2
 --ramulator_bankgroups           4
@@ -216,28 +225,10 @@
 --ramulator_chip_width           8
 --ramulator_rows                 65536
 --ramulator_cols                 1024
---ramulator_scheduling_policy    FRFCFS_Cap
+--ramulator_scheduling_policy    FRFCFS
 --ramulator_readq_entries        32
 --ramulator_writeq_entries       32
---ramulator_record_cmd_trace     FALSE
---ramulator_print_cmd_trace      FALSE
 --ramulator_tCK                  625000
---ramulator_tCL                  22
---ramulator_tCCD                 10
---ramulator_tCCDS                10
---ramulator_tCCDL                2
---ramulator_tCWL                 16
---ramulator_tBL                  4
---ramulator_tWTR                 12
---ramulator_tWTRS                12
---ramulator_tWTRL                24
---ramulator_tRP                  22
---ramulator_tRPpb                22
---ramulator_tRPab                22
---ramulator_tRCD                 22
---ramulator_tRCDR                22
---ramulator_tRCDW                22
---ramulator_tRAS                 56
 --dram_tech_in_nm                19
 ## Other
 

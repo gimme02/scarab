@@ -140,7 +140,25 @@ def ddr4_2400r_8gb_x8(channels):
     )
 
 
+def ddr4_3200_mobius():
+    """Mobius Lion Cove DDR4 organization and effective DDR4 timings.
+
+    The legacy DDR4 backend consumes the S/L timings (not generic tCCD/tWTR),
+    derives nRC from nRAS+nRP, and obtains RRDS/RRDL/FAW/RFC/REFI from its
+    3200 MT/s, 8 Gb x8 tables. Keep those values while using Ramulator 2's
+    upstream FRFCFS controller (legacy FRFCFS_Cap is not equivalent).
+    """
+    return generic_ddr(
+        "DDR4", "DDR4_8Gb_x8", "DDR4_3200AA", 4, rank=2,
+        nCL=22, nRCD=22, nRP=22, nRAS=56, nRC=78,
+        nCWL=16, nBL=4, nCCDS=10, nCCDL=2, nWTRS=12, nWTRL=24,
+        nWR=24, nRTP=12, nRRDS=4, nRRDL=8, nFAW=34, nRFC=560,
+        nREFI=12480, nCS=2, tCK_ps=625,
+    )
+
+
 CONFIGS = {
+    "DDR4_3200_Mobius_8Gb_x8_4ch_2rank.yaml": ddr4_3200_mobius,
     "DDR4_2400R_8Gb_x8_1ch.yaml": lambda: ddr4_2400r_8gb_x8(1),
     "DDR4_2400R_8Gb_x8_2ch.yaml": lambda: ddr4_2400r_8gb_x8(2),
     "DDR5_4800AN_16Gb_x8_1ch.yaml": lambda: ddr5_4800an_16gb_x8(1),
