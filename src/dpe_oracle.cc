@@ -251,7 +251,7 @@ void dpo_finish(uns p) {
   };
   for (unsigned i=0;i<sizeof(values)/sizeof(values[0]);++i)
     INC_STAT_EVENT(p,DPO_CBR_COMPARED+i,values[i]);
-  if (DPE_ORACLE_SERIAL) {
+  if (DPE_ORACLE_SERIAL && c->roi) {
     auto* s=c->serial_counts;
     s[10]=bool(c->serial.active()); s[11]=bool(c->serial.pending());
     ASSERT(p,s[8]+s[0]==s[2]+s[3]+s[10]);
