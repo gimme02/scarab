@@ -551,12 +551,14 @@ FT_Ended_By FT::get_end_reason() const {
       return FT_APP_EXIT;
     } else if (bar_fetch) {
       return FT_BAR_FETCH;
-    } else if (op->dpo_serial_boundary) {
-      return FT_DPO_SERIAL_STOP;
     } else if (cf_taken) {
       return FT_TAKEN_BRANCH;
     } else if (end_of_icache_line) {
       return FT_ICACHE_LINE_BOUNDARY;
+    } else if (op->dpo_serial_boundary) {
+      // Keep native taken/line/exit classifications (and their bandwidth
+      // accounting); only a formerly unterminated prefix needs a new kind.
+      return FT_DPO_SERIAL_STOP;
     }
   }
 
@@ -732,6 +734,10 @@ unsigned FT::serial_selftest() {
   test(f.get_end_reason()==FT_NOT_ENDED);
   op[1].bp_pred_main.pred=TAKEN;
   test(f.get_end_reason()==FT_TAKEN_BRANCH);
+  op[1].dpo_serial_boundary=TRUE;
+  test(f.get_end_reason()==FT_TAKEN_BRANCH);
+  op[1].bp_pred_main.pred=NOT_TAKEN; inst[1].addr=0x1000+ICACHE_LINE_SIZE-4;
+  test(f.get_end_reason()==FT_ICACHE_LINE_BOUNDARY);
   f.ops.clear(); // stack fixtures are not op-pool allocations
   return n;
 }
