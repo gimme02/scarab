@@ -689,3 +689,50 @@ std::set<Addr> FT::get_pcs() {
   }
   return pc_set;
 }
+
+// Exercise the production FT split/ownership and boundary rules without a trace.
+unsigned FT::serial_selftest() {
+  unsigned n=0;
+  auto test=[&](bool ok){ ASSERTM(0,ok,"DPO FT selftest failed"); ++n; };
+  Static_Inst_Info inst[3]={};
+  Static_Op_Info uop[3]={};
+  Op op[3]={};
+  FT f;
+  f.is_prebuilt=true;
+  for(unsigned i=0;i<3;++i) {
+    inst[i].addr=0x1000+4*i; inst[i].inst_size=4;
+    op[i].inst=&inst[i]; op[i].uop=&uop[i];
+    op[i].op_pool_valid=TRUE; op[i].bom=op[i].eom=TRUE;
+    op[i].parent_FT=&f; op[i].oracle_info.npc=inst[i].addr+4;
+    op[i].bp_pred_main.pred_npc=op[i].oracle_info.npc;
+    f.ops.push_back(&op[i]);
+  }
+  uop[1].cf_type=CF_CBR;
+  op[1].dpo_serial_boundary=TRUE;
+  op[2].exit=TRUE;
+  test(f.get_end_reason()==FT_APP_EXIT);
+  auto split=f.extract_off_path_ft(1);
+  FT* prefix=split.first;
+  test(prefix!=&f && split.second==&f);
+  test(prefix->get_end_reason()==FT_DPO_SERIAL_STOP);
+  test(prefix->ops.size()==2 && prefix->get_last_op()==&op[1]);
+  test(f.op_pos==2 && f.get_ft_info().static_info.n_uops==1);
+  test(f.get_start_addr()==0x1008 && f.is_consecutive(*prefix));
+  test(op[0].parent_FT==&f && op[1].parent_FT_off_path==prefix);
+  free_ft(prefix); // alias prefix releases its references, not the original ops
+  test(!op[0].parent_FT_off_path && !op[1].parent_FT_off_path);
+  f.ops.resize(2); f.op_pos=0;
+  split=f.extract_off_path_ft(1);
+  test(split.first==&f && split.second==nullptr);
+  op[1].eom=FALSE;
+  test(f.get_end_reason()==FT_NOT_ENDED); // never cut a macro instruction
+  op[1].eom=TRUE; op[1].exit=TRUE;
+  test(f.get_end_reason()==FT_APP_EXIT);
+  op[1].exit=FALSE; op[1].dpo_serial_boundary=FALSE;
+  test(f.get_end_reason()==FT_NOT_ENDED);
+  op[1].bp_pred_main.pred=TAKEN;
+  test(f.get_end_reason()==FT_TAKEN_BRANCH);
+  f.ops.clear(); // stack fixtures are not op-pool allocations
+  return n;
+}
+extern "C" unsigned dpo_ft_selftest(void) { return FT::serial_selftest(); }

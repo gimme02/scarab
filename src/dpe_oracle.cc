@@ -69,7 +69,7 @@ void dpo_init(void) {
   ASSERTM(0, !DPE_ORACLE_SERIAL || DPE_ORACLE_MODE, "serial oracle requires mode 1 or 2");
   ASSERTM(0, !DPE_ORACLE_SERIAL || (!LOOKAHEAD_BUF_SIZE && !MAP_LOOKAHEAD),
           "serial oracle currently requires lookahead_buf_size=0 and map_lookahead=0");
-  unsigned tests = DPE_ORACLE_SELFTEST ? dpo::selftest() + (DPE_ORACLE_SERIAL ? dpo::serial_selftest() : 0) : 0;
+  unsigned tests = DPE_ORACLE_SELFTEST ? dpo::selftest() + (DPE_ORACLE_SERIAL ? dpo::serial_selftest() + dpo_ft_selftest() : 0) : 0;
   if (tests) fprintf(mystdout, "DPO selftests passed: %u\n", tests);
   cores.clear();
   if (!DPE_ORACLE_MODE) return;

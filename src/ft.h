@@ -104,6 +104,7 @@ inline bool operator<(const FT_Info_Static& a, const FT_Info_Static& b) {
 // to `class` since the definition uses explicit access specifiers.
 struct FT {
  public:
+  static unsigned serial_selftest();
   FT() = default;  // only used as the reset template in reinit()
   FT(uns _proc_id, uns _bp_id);
   FT& operator=(const FT&) = default;
